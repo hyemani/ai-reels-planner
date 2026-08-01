@@ -2,15 +2,8 @@
 
 import { useState } from "react";
 
-// 스토리보드는 아직 가짜 데이터 그대로 사용 (다음 단계에서 다룰 예정)
-const fakeStoryboard = [
-  { scene: 1, content: "도착 장면 - 설레는 표정으로 입구를 들어서는 모습" },
-  { scene: 2, content: "공간 소개 - 방 안 곳곳을 훑는 카메라 워크" },
-  { scene: 3, content: "하이라이트 - 가장 인상적인 순간을 강조" },
-  { scene: 4, content: "마무리 - 감상 한마디와 함께 여운을 남기는 컷" },
-];
-
 type Concept = { id: number; title: string; description: string };
+type Scene = { scene: number; content: string };
 
 export default function Home() {
   const [title, setTitle] = useState("");
@@ -18,10 +11,12 @@ export default function Home() {
   const [step, setStep] = useState<"input" | "concept" | "storyboard">("input");
   const [selectedConcept, setSelectedConcept] = useState<number | null>(null);
   const [concepts, setConcepts] = useState<Concept[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [storyboard, setStoryboard] = useState<Scene[]>([]);
+  const [isLoadingConcepts, setIsLoadingConcepts] = useState(false);
+  const [isLoadingStoryboard, setIsLoadingStoryboard] = useState(false);
 
   const handleSubmit = async () => {
-    setIsLoading(true);
+    setIsLoadingConcepts(true);
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -34,13 +29,33 @@ export default function Home() {
     } catch (error) {
       alert("콘셉트를 만드는 중 문제가 생겼어요. 다시 시도해주세요.");
     } finally {
-      setIsLoading(false);
+      setIsLoadingConcepts(false);
     }
   };
 
-  const handleSelectConcept = (id: number) => {
-    setSelectedConcept(id);
-    setStep("storyboard");
+  const handleSelectConcept = async (concept: Concept) => {
+    setSelectedConcept(concept.id);
+    setIsLoadingStoryboard(true);
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "storyboard",
+          title,
+          description,
+          conceptTitle: concept.title,
+          conceptDescription: concept.description,
+        }),
+      });
+      const data = await response.json();
+      setStoryboard(data.storyboard);
+      setStep("storyboard");
+    } catch (error) {
+      alert("스토리보드를 만드는 중 문제가 생겼어요. 다시 시도해주세요.");
+    } finally {
+      setIsLoadingStoryboard(false);
+    }
   };
 
   return (
@@ -66,8 +81,8 @@ export default function Home() {
         />
       </div>
 
-      <button onClick={handleSubmit} disabled={isLoading} style={{ marginTop: "20px", padding: "10px 20px" }}>
-        {isLoading ? "AI가 콘셉트를 만드는 중..." : "제출"}
+      <button onClick={handleSubmit} disabled={isLoadingConcepts} style={{ marginTop: "20px", padding: "10px 20px" }}>
+        {isLoadingConcepts ? "AI가 콘셉트를 만드는 중..." : "제출"}
       </button>
 
       {(step === "concept" || step === "storyboard") && (
@@ -76,7 +91,7 @@ export default function Home() {
           {concepts.map((concept) => (
             <div
               key={concept.id}
-              onClick={() => handleSelectConcept(concept.id)}
+              onClick={() => handleSelectConcept(concept)}
               style={{
                 border: selectedConcept === concept.id ? "2px solid #333" : "1px solid #ccc",
                 borderRadius: "8px",
@@ -89,13 +104,14 @@ export default function Home() {
               <p style={{ margin: "4px 0 0", color: "#666" }}>{concept.description}</p>
             </div>
           ))}
+          {isLoadingStoryboard && <p style={{ marginTop: "10px", color: "#666" }}>AI가 스토리보드를 만드는 중...</p>}
         </div>
       )}
 
       {step === "storyboard" && (
         <div style={{ marginTop: "40px", borderTop: "1px solid #ddd", paddingTop: "20px" }}>
           <h2>스토리보드</h2>
-          {fakeStoryboard.map((scene) => (
+          {storyboard.map((scene) => (
             <div key={scene.scene} style={{ marginTop: "10px" }}>
               <strong>장면 {scene.scene}</strong>
               <p style={{ margin: "4px 0 0", color: "#666" }}>{scene.content}</p>
