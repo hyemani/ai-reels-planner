@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "./supabase";
 
 type Concept = { id: number; title: string; description: string };
 type Scene = { scene: number; content: string };
@@ -9,11 +10,13 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [step, setStep] = useState<"input" | "concept" | "storyboard">("input");
-  const [selectedConcept, setSelectedConcept] = useState<number | null>(null);
+  const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
   const [concepts, setConcepts] = useState<Concept[]>([]);
   const [storyboard, setStoryboard] = useState<Scene[]>([]);
   const [isLoadingConcepts, setIsLoadingConcepts] = useState(false);
   const [isLoadingStoryboard, setIsLoadingStoryboard] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   const handleSubmit = async () => {
     setIsLoadingConcepts(true);
@@ -34,7 +37,7 @@ export default function Home() {
   };
 
   const handleSelectConcept = async (concept: Concept) => {
-    setSelectedConcept(concept.id);
+    setSelectedConcept(concept);
     setIsLoadingStoryboard(true);
     try {
       const response = await fetch("/api/generate", {
@@ -55,6 +58,25 @@ export default function Home() {
       alert("스토리보드를 만드는 중 문제가 생겼어요. 다시 시도해주세요.");
     } finally {
       setIsLoadingStoryboard(false);
+    }
+  };
+
+  const handleSaveProject = async () => {
+    setIsSaving(true);
+    setSaveMessage("");
+    try {
+      const { error } = await supabase.from("projects").insert({
+        title,
+        description,
+        concept: JSON.stringify(selectedConcept),
+        storyboard: JSON.stringify(storyboard),
+      });
+      if (error) throw error;
+      setSaveMessage("저장됐어요!");
+    } catch (error) {
+      setSaveMessage("저장 중 문제가 생겼어요.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -93,7 +115,7 @@ export default function Home() {
               key={concept.id}
               onClick={() => handleSelectConcept(concept)}
               style={{
-                border: selectedConcept === concept.id ? "2px solid #333" : "1px solid #ccc",
+                border: selectedConcept?.id === concept.id ? "2px solid #333" : "1px solid #ccc",
                 borderRadius: "8px",
                 padding: "12px",
                 marginTop: "10px",
@@ -117,6 +139,11 @@ export default function Home() {
               <p style={{ margin: "4px 0 0", color: "#666" }}>{scene.content}</p>
             </div>
           ))}
+
+          <button onClick={handleSaveProject} disabled={isSaving} style={{ marginTop: "20px", padding: "10px 20px" }}>
+            {isSaving ? "저장하는 중..." : "프로젝트 저장"}
+          </button>
+          {saveMessage && <p style={{ marginTop: "10px" }}>{saveMessage}</p>}
         </div>
       )}
     </main>
